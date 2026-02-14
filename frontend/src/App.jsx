@@ -13,6 +13,7 @@ import ProfilePage from './pages/ProfilePage';
 import RecipesPage from './pages/RecipesPage';
 import SearchPage from './pages/SearchPage';
 import FavoritesPage from './pages/FavoritesPage';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   return (
@@ -47,6 +48,14 @@ function App() {
               element={
                 <ProtectedRoute requireProfileComplete={true}>
                   <RecipesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute requireProfileComplete={true}>
+                  <Dashboard />
                 </ProtectedRoute>
               }
             />
