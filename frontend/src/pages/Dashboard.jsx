@@ -6,6 +6,7 @@ import WeeklyChart from '../components/WeeklyChart';
 import PlanTodo from '../components/PlanTodo';
 import CreatePlanModal from '../components/CreatePlanModal';
 import EditMealModal from '../components/EditMealModal';
+import { generatePlan, getLatestPlan } from '../services/api';
 
 const dummyUser = { name: 'Jessica', primaryGoal: 'Weight loss' };
 
@@ -26,19 +27,56 @@ const dummyPlan = {
 
 export default function Dashboard() {
   const [user] = useState(dummyUser);
-  const [plan, setPlan] = useState(dummyPlan);
+  const [plan, setPlan] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    // could fetch plan from API here
+    // Fetch a generated plan from backend (do not use mocks)
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Try to get latest saved plan first
+        const latest = await getLatestPlan().catch(() => null);
+        if (latest && latest.plan) {
+          // transform to frontend shape
+          const planObj = { meta: latest.plan.meta || {}, days: (latest.plan.week || []).map(d => ({ date: new Date(), meals: d.meals })) };
+          setPlan(planObj);
+        } else {
+          // generate a fresh plan
+          const resp = await generatePlan({ mealsPerDay: 3 });
+          if (resp && resp.plan && resp.plan.week) {
+            const planObj = { meta: resp.plan.meta || {}, days: (resp.plan.week || []).map(d => ({ date: new Date(), meals: d.meals })) };
+            setPlan(planObj);
+          } else {
+            throw new Error('No plan returned from server');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load plan', err);
+        setError(err.message || 'Failed to load plan');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, []);
 
   const handleCreate = (profile) => {
-    // For now simulate generate by adjusting dummyPlan
+    // If CreatePlanModal returned a full plan (with days), use it directly
+    if (profile && profile.days && Array.isArray(profile.days)) {
+      setPlan(profile);
+      return;
+    }
+
+    // Otherwise fallback: simulate generate by adjusting dummyPlan
     const generated = { ...dummyPlan };
-    generated.meta.dailyCalorieTarget = profile.calories || 2000;
+    generated.meta.dailyCalorieTarget = profile?.calories || 2000;
     setPlan(generated);
   };
 
@@ -112,6 +150,23 @@ export default function Dashboard() {
         <Topbar user={user} />
 
         <main className="p-4 space-y-4">
+          {loading && (
+            <div className="p-8 text-center">
+              <div className="inline-block w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+              <div className="mt-3 text-gray-600">Generating your personalized plan…</div>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded">Error: {error}</div>
+          )}
+
+          {!loading && !error && !plan && (
+            <div className="p-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded">No plan available.</div>
+          )}
+
+          {!loading && !error && plan && (
+          <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-2 bg-white rounded-lg shadow-sm p-6">
               <div className="flex items-center justify-between">
@@ -153,7 +208,9 @@ export default function Dashboard() {
               <div className="bg-white rounded-lg shadow-sm p-4">Quick Actions</div>
               <div className="bg-white rounded-lg shadow-sm p-4">Recent History</div>
             </aside>
-          </div>
+            </div>
+          </>
+          )}
         </main>
       </div>
 

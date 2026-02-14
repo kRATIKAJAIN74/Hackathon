@@ -29,6 +29,25 @@ export const RecipeProvider = ({ children }) => {
     }
   };
 
+  const recommendMeals = async (payload = {}) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiClient.post('/expert/recommend', payload);
+      // backend returns recommendations as { recipe, score }
+      const list = (response.data.recommendations || []).map(r => r.recipe || r);
+      setRecommendations(list.slice(0, 20));
+      return list;
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to get meal recommendations';
+      setError(errorMsg);
+      console.error('Error recommending meals:', err);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const searchRecipes = async (query, filters = {}, limit = 20) => {
     setLoading(true);
     setError(null);
@@ -133,6 +152,7 @@ export const RecipeProvider = ({ children }) => {
         addFavorite,
         removeFavorite,
         fetchFavorites,
+        recommendMeals,
       }}
     >
       {children}

@@ -3,6 +3,7 @@ import { useRecipe } from '../context/RecipeContext';
 import RecipeCard from '../components/RecipeCard';
 import Layout from '../components/Layout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import FindMealModal from '../components/FindMealModal';
 
 export const RecipesPage = () => {
   const {
@@ -14,10 +15,12 @@ export const RecipesPage = () => {
     addFavorite,
     removeFavorite,
     fetchFavorites,
+    recommendMeals,
   } = useRecipe();
 
   const [limit, setLimit] = useState(10);
   const [diverse, setDiverse] = useState(false);
+  const [findOpen, setFindOpen] = useState(false);
 
   useEffect(() => {
     // Fetch recommendations and favorites on mount
@@ -27,6 +30,11 @@ export const RecipesPage = () => {
 
   const loadRecommendations = async () => {
     await fetchRecommendations(limit, diverse);
+  };
+
+  const handleFind = async (payload) => {
+    // call expert recommend endpoint via context
+    await recommendMeals(payload);
   };
 
   const handleFavoriteToggle = async (recipeId, isFav) => {
@@ -95,12 +103,21 @@ export const RecipesPage = () => {
               </div>
             </div>
 
-            <button
-              onClick={loadRecommendations}
-              className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition"
-            >
-              Refresh Recommendations
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setFindOpen(true)}
+                className="bg-white px-4 py-2 rounded-lg border"
+              >
+                Find Meal
+              </button>
+
+              <button
+                onClick={loadRecommendations}
+                className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-opacity-90 transition"
+              >
+                Refresh Recommendations
+              </button>
+            </div>
           </div>
         </div>
 
@@ -134,6 +151,7 @@ export const RecipesPage = () => {
           </div>
         )}
       </div>
+      <FindMealModal open={findOpen} onClose={() => setFindOpen(false)} onFind={handleFind} />
     </Layout>
   );
 };

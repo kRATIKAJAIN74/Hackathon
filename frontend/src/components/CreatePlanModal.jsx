@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import apiClient from '../utils/apiClient';
 
 const Goals = ['Weight loss', 'Weight gain', 'Muscle gain', 'Diabetes control', 'PCOS management', 'Heart health', 'General fitness'];
 const Diets = ['Vegetarian', 'Non-Vegetarian', 'Vegan', 'Keto', 'Low-carb', 'High-protein'];
@@ -15,10 +16,39 @@ export default function CreatePlanModal({ open, onClose, onCreate }) {
     });
   };
 
-  const submit = (e) => {
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
     e.preventDefault();
-    onCreate(form);
-    onClose();
+    setLoading(true);
+    try {
+      const payload = {
+        goal: form.goal,
+        dietType: form.dietType,
+        allergies: form.allergies,
+        activityLevel: form.activity,
+        dailyCalorieTarget: form.calories ? Number(form.calories) : undefined,
+        mealsPerDay: form.mealsPerDay,
+        preferences: [],
+      };
+
+      const resp = await apiClient.post('/generate-plan', payload).catch(err => ({ data: null, error: err }));
+      if (resp?.data?.plan) {
+        const plan = resp.data.plan;
+        // transform to { meta, days } for frontend components
+        const days = (plan.week || []).map(d => ({ date: new Date(), meals: d.meals }));
+        onCreate({ meta: plan.meta, days });
+      } else {
+        // fallback to local onCreate
+        onCreate(form);
+      }
+    } catch (err) {
+      console.error('Failed to generate plan', err);
+      onCreate(form);
+    } finally {
+      setLoading(false);
+      onClose();
+    }
   };
 
   if (!open) return null;
@@ -74,7 +104,9 @@ export default function CreatePlanModal({ open, onClose, onCreate }) {
 
           <div className="flex justify-end gap-2">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-md">Cancel</button>
-            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded-md">Generate Plan</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 bg-indigo-600 text-white rounded-md">
+              {loading ? 'Generating...' : 'Generate Plan'}
+            </button>
           </div>
         </form>
       </div>

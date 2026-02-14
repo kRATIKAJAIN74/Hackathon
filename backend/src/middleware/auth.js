@@ -44,6 +44,23 @@ export const verifyToken = (req, res, next) => {
 };
 
 /**
+ * Optional token verifier: if token present, verify and attach req.user.
+ * If no token, continue without error.
+ */
+export const optionalVerifyToken = (req, res, next) => {
+  try {
+    const token = extractToken(req);
+    if (!token) return next();
+    const decoded = jwt.verify(token, config.jwtSecret);
+    req.user = decoded;
+    return next();
+  } catch (error) {
+    // on any token error, ignore and continue (treat as unauthenticated)
+    return next();
+  }
+};
+
+/**
  * Extract token from Authorization header
  */
 const extractToken = (req) => {

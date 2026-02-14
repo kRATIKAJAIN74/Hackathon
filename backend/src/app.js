@@ -3,6 +3,7 @@ import cors from 'cors';
 import config from './config/config.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
+import generateRoutes from './routes/generateRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import recipeRoutes from './routes/recipeRoutes.js';
 import planRoutes from './routes/planRoutes.js';
@@ -18,6 +19,7 @@ app.use(cors({
 }));
 
 // Request logging
+app.use('/api', generateRoutes);
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
