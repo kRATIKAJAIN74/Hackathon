@@ -1,8 +1,9 @@
 import React, {useEffect, useState} from 'react'
 import { Bar, Scatter, Pie } from 'react-chartjs-2'
-import { Chart, LinearScale, CategoryScale, BarElement, PointElement, Tooltip, Legend } from 'chart.js'
+import { Chart, LinearScale, CategoryScale, BarElement, PointElement, Tooltip, Legend, ArcElement, PieController, BarController, ScatterController } from 'chart.js'
 
-Chart.register(LinearScale, CategoryScale, BarElement, PointElement, Tooltip, Legend)
+// Register all controllers/elements we use (bar, pie, scatter)
+Chart.register(LinearScale, CategoryScale, BarElement, BarController, PointElement, ScatterController, ArcElement, PieController, Tooltip, Legend)
 
 export default function NutritionChart(){
   const [recipes, setRecipes] = useState([])

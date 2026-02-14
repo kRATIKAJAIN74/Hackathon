@@ -3,7 +3,10 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from .db import get_collection
 from .recipes_fetcher import fetch_recipes, fetch_recipeofday
+from .importer import import_remote_pages
 from bson.objectid import ObjectId
+from flask import send_from_directory
+import os
 
 app = Flask(__name__)
 CORS(app)
@@ -113,6 +116,77 @@ def flavor_pairings():
         counts[p] = counts.get(p, 0) + 1
     sorted_pairs = sorted(counts.items(), key=lambda x: x[1], reverse=True)
     return jsonify({'ingredient': ing, 'pairings': [p for p, _ in sorted_pairs[:20]], 'attrs': doc.get('attrs', {})})
+
+
+@app.route('/seed_demo')
+def seed_demo():
+    demo = [
+        {
+            'recipe_id': 'demo1',
+            'title': 'Chickpea & Tahini Salad',
+            'nutrition': {'calories': 280.0, 'protein': 10.5, 'fat': 18.0, 'carbs': 18.0},
+            'region': 'Mediterranean',
+            'diet': 'vegetarian',
+            'utensils': ['bowl','knife'],
+            'processes': ['mix','chop'],
+            'ingredients': ['chickpeas','tahini','lemon','parsley','olive oil'],
+            'flavors': {'savory': 7.5, 'bitter':1.2}
+        },
+        {
+            'recipe_id': 'demo2',
+            'title': 'Lentil Soup',
+            'nutrition': {'calories': 210.0, 'protein': 12.0, 'fat': 4.0, 'carbs': 30.0},
+            'region': 'Middle Eastern',
+            'diet': 'vegan',
+            'utensils': ['pot','ladle'],
+            'processes': ['boil','simmer'],
+            'ingredients': ['lentils','onion','carrot','cumin','garlic'],
+            'flavors': {'savory':8.0,'spicy':2.0}
+        },
+        {
+            'recipe_id': 'demo3',
+            'title': 'Egyptian Falafel Wrap',
+            'nutrition': {'calories': 420.0, 'protein': 15.0, 'fat': 20.0, 'carbs': 45.0},
+            'region': 'Egyptian',
+            'diet': 'vegetarian',
+            'utensils': ['pan','spatula'],
+            'processes': ['fry','assemble'],
+            'ingredients': ['chickpeas','tahini','pita','tomato','lettuce'],
+            'flavors': {'savory':8.5,'herbal':3.0}
+        }
+    ]
+    for it in demo:
+        recipes_col.update_one({'recipe_id': it['recipe_id']}, {'$set': it}, upsert=True)
+        ings = it.get('ingredients', [])
+        for ing in ings:
+            other = [o for o in ings if o != ing]
+            flavors_col.update_one({'ingredient': ing}, {'$setOnInsert': {'ingredient': ing}, '$addToSet': {'pairings': {'$each': other}}, '$set': {'attrs': it.get('flavors', {})}}, upsert=True)
+    return jsonify({'inserted': len(demo)})
+
+
+@app.route('/import_remote')
+def import_remote():
+    # query params: start, limit, max_pages, clear
+    try:
+        start = int(request.args.get('start', 1))
+        limit = int(request.args.get('limit', 50))
+        max_pages = int(request.args.get('max_pages', 20))
+        clear = request.args.get('clear', 'false').lower() in ('1','true','yes')
+    except Exception:
+        return jsonify({'error': 'invalid params'}), 400
+    n = import_remote_pages(start_page=start, limit=limit, max_pages=max_pages, clear_existing=clear)
+    return jsonify({'imported': n, 'start': start, 'limit': limit, 'max_pages': max_pages})
+
+
+@app.route('/')
+def index():
+    root = os.path.join(os.path.dirname(__file__), 'static')
+    return send_from_directory(root, 'index.html')
+
+@app.route('/<path:filename>')
+def static_files(filename):
+    root = os.path.join(os.path.dirname(__file__), 'static')
+    return send_from_directory(root, filename)
 
 
 if __name__ == '__main__':
