@@ -29,13 +29,19 @@ const userSchema = new mongoose.Schema(
     profile: {
       goal: {
         type: String,
-        enum: ['fitness', 'diabetes', 'heart_health', 'weight_loss', 'general_wellness'],
-        default: null,
+        enum: {
+          values: ['fitness', 'diabetes', 'heart_health', 'weight_loss', 'general_wellness'],
+          message: '{VALUE} is not a valid goal'
+        },
+        required: false,
       },
       dietType: {
         type: String,
-        enum: ['vegetarian', 'non_vegetarian', 'vegan'],
-        default: null,
+        enum: {
+          values: ['vegetarian', 'non_vegetarian', 'vegan'],
+          message: '{VALUE} is not a valid diet type'
+        },
+        required: false,
       },
       allergies: {
         type: [String],
