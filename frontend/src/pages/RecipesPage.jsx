@@ -11,6 +11,7 @@ export const RecipesPage = () => {
     favorites,
     loading,
     error,
+    expertMeta,
     fetchRecommendations,
     addFavorite,
     removeFavorite,
@@ -127,26 +128,38 @@ export const RecipesPage = () => {
           </div>
         )}
 
+        {expertMeta && (expertMeta.totalCandidates > 0 || expertMeta.filteredCount > 0) && (
+          <div className="bg-white rounded-lg p-4 border border-gray-200">
+            <p className="text-sm text-gray-600">
+              Found <strong>{expertMeta.totalCandidates}</strong> candidates, <strong>{expertMeta.filteredCount}</strong> match your diet and goals.
+              {expertMeta.targets?.adjustedCalories != null && (
+                <span className="ml-2"> Daily target: ~{expertMeta.targets.adjustedCalories} cal.</span>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* Recipes Grid */}
         {recommendations.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {recommendations.map((recipe) => (
-              <ProtectedRoute key={recipe.id} requireProfileComplete>
-                <RecipeCard
-                  recipe={recipe}
-                  isFavorite={favorites.includes(recipe.id)}
-                  onFavoriteToggle={() =>
-                    handleFavoriteToggle(recipe.id, favorites.includes(recipe.id))
-                  }
-                />
-              </ProtectedRoute>
-            ))}
+            {recommendations.map((recipe) => {
+              const id = recipe?.id ?? recipe?.name ?? String(Math.random());
+              return (
+                <ProtectedRoute key={id} requireProfileComplete>
+                  <RecipeCard
+                    recipe={recipe}
+                    isFavorite={favorites.includes(id)}
+                    onFavoriteToggle={() => handleFavoriteToggle(id, favorites.includes(id))}
+                  />
+                </ProtectedRoute>
+              );
+            })}
           </div>
         ) : (
-          <div className="text-center py-12 bg-white rounded-lg">
-            <p className="text-gray-600 text-lg">No recipes found matching your criteria</p>
+          <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+            <p className="text-gray-600 text-lg">No suitable recipes found</p>
             <p className="text-gray-500 text-sm mt-2">
-              Try adjusting your preferences or health settings
+              Try adjusting your preferences, allergies, or health goals in Find Meal
             </p>
           </div>
         )}

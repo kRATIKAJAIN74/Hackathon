@@ -10,12 +10,10 @@ import scoringEngine from '../expert-system/scoringEngine.js';
 export const generatePlanEndpoint = catchAsync(async (req, res) => {
   const profile = req.body || {};
 
-  // validate some fields
   if (!profile.mealsPerDay) profile.mealsPerDay = 3;
 
   const plan = await generateSmartWeeklyPlan(profile);
 
-  // If user authenticated, save to DB (bonus)
   const userId = req.user?.userId;
   let saved = null;
   if (userId) {
@@ -26,51 +24,93 @@ export const generatePlanEndpoint = catchAsync(async (req, res) => {
   res.json({ success: true, plan, saved });
 });
 
-// Expert-style recipe recommendations (standalone endpoint)
+/**
+ * Build recommendation item for frontend: id, title, calories, protein, score, reasons.
+ * Uses normalized recipe shape (flat calories/protein or nutrition.*).
+ */
+const toRecommendationItem = (scoredItem) => {
+  const r = scoredItem?.recipe;
+  const score = typeof scoredItem?.score === 'number' ? scoredItem.score : 0;
+  const reasons = Array.isArray(scoredItem?.reasons) ? scoredItem.reasons : [];
+
+  if (!r || typeof r !== 'object') {
+    return { id: 'unknown', title: 'Unknown', calories: 0, protein: 0, score, reasons };
+  }
+
+  const calories = typeof r.calories === 'number' ? r.calories : (r.nutrition && typeof r.nutrition.calories === 'number') ? r.nutrition.calories : 0;
+  const protein = typeof r.protein === 'number' ? r.protein : (r.nutrition && typeof r.nutrition.protein === 'number') ? r.nutrition.protein : 0;
+
+  return {
+    id: r.id ?? r.name ?? 'unknown',
+    title: r.title ?? r.name ?? 'Recipe',
+    image: r.image ?? r.imageUrl ?? null,
+    calories,
+    protein,
+    score,
+    reasons,
+    recipe: r,
+  };
+};
+
 export const recommendRecipesEndpoint = catchAsync(async (req, res) => {
   const payload = req.body || {};
+  const debug = req.query?.debug === 'true' || req.query?.debug === '1';
 
-  // Collect and infer targets
   const facts = collectFacts(payload);
   const targets = inference.inferTargets(facts);
 
-  // Build a search query from preferences or goal
   const query = (payload.preferences && payload.preferences.length) ? payload.preferences.join(' ') : (facts.goal || 'healthy');
 
-  // Fetch candidates from RecipeDB (safe fallback inside service)
-  const raw = await recipeDb.searchRecipes({
+  let totalCandidates = 0;
+
+  const fetchOptions = {
     searchTerm: query,
     dietType: payload.dietType,
     allergies: payload.allergies || [],
     limit: 20,
-    // Provide a postFilter so the service can adaptively fetch more pages if too few results
-    postFilter: (items) => filterEngine.filterRecipes(items || [], targets, facts),
     minResults: 12,
-  });
+    postFilter: (items) => filterEngine.filterRecipes(items || [], targets, facts),
+  };
 
-  // Log what we received from recipe service for debugging (length and sample ids)
-  try {
-    if (Array.isArray(raw)) {
-      console.log(`generateController.recommendRecipesEndpoint: received ${raw.length} candidate recipes`);
-      const sample = raw.slice(0, 5).map(r => r.id || r.name).join(', ');
-      console.log(`generateController.recommendRecipesEndpoint: sample ids/names: ${sample}`);
-    } else {
-      console.log('generateController.recommendRecipesEndpoint: received non-array response', typeof raw);
-    }
-  } catch (e) {
-    console.warn('generateController logging failed', e.message || e);
+  if (debug) {
+    fetchOptions.pages = 2;
   }
 
-  // Filter locally using expert-system heuristics (ensure shaped data)
+  const raw = await recipeDb.searchRecipes(fetchOptions);
+  totalCandidates = Array.isArray(raw) ? raw.length : 0;
+
   const filtered = filterEngine.filterRecipes(raw || [], targets, facts);
+  const filteredCount = filtered.length;
 
-  // Score the remaining recipes
   const scored = scoringEngine.scoreRecipes(filtered, targets, facts);
+  const top = scored.slice(0, 12);
+  const recommendations = top.map(toRecommendationItem);
 
-  // Return top N
-  const top = scored.slice(0, 12).map(s => ({ recipe: s.recipe, score: s.score }));
+  if (debug) {
+    return res.json({
+      success: true,
+      debug: {
+        remoteSucceeded: totalCandidates > 0,
+        totalCandidates,
+        filteredCount,
+        recommendationsReturned: recommendations.length,
+        baseUrlConfigured: Boolean(process.env.RECIPE_BASE_URL),
+        hasApiKey: Boolean(process.env.RECIPE_API_KEY),
+      },
+      targets,
+      totalCandidates,
+      filteredCount,
+      recommendations,
+    });
+  }
 
-  res.json({ success: true, recommendations: top, meta: { count: top.length, targets } });
+  res.json({
+    success: true,
+    targets,
+    totalCandidates,
+    filteredCount,
+    recommendations,
+  });
 });
 
 export default {

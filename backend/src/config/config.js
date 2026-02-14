@@ -23,6 +23,11 @@ export const config = {
   
   // Cache
   cacheDuration: parseInt(process.env.CACHE_DURATION || '3600', 10),
+
+  // RecipeDB external API (cosylab.iiitd.edu.in)
+  recipeBaseUrl: process.env.RECIPE_BASE_URL || '',
+  recipeApiKey: process.env.RECIPE_API_KEY || '',
+  cacheTtlSeconds: parseInt(process.env.CACHE_TTL || '300', 10),
 };
 
 export default config;

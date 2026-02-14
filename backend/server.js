@@ -1,6 +1,7 @@
 import app from './src/app.js';
 import { connectDatabase } from './src/config/database.js';
 import config from './src/config/config.js';
+import recipeDb from './src/services/recipeDbService.js';
 
 const PORT = config.port;
 
@@ -9,10 +10,16 @@ const PORT = config.port;
  */
 const startServer = async () => {
   try {
-    // Connect to database
     await connectDatabase();
 
-    // Start listening
+    if (recipeDb.logRecipeConfig) {
+      recipeDb.logRecipeConfig();
+    } else {
+      const url = config.recipeBaseUrl || process.env.RECIPE_BASE_URL || '(none)';
+      const hasKey = Boolean(config.recipeApiKey || process.env.RECIPE_API_KEY);
+      console.log(JSON.stringify({ message: 'Recipe API config', baseUrl: url, hasApiKey: hasKey }));
+    }
+
     app.listen(PORT, () => {
       console.log(`\n${'='.repeat(50)}`);
       console.log(`✓ Server running on http://localhost:${PORT}`);

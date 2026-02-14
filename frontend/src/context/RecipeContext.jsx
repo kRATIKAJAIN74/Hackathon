@@ -9,16 +9,19 @@ export const RecipeProvider = ({ children }) => {
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [expertMeta, setExpertMeta] = useState(null);
 
   const fetchRecommendations = async (limit = 10, diverse = false) => {
     setLoading(true);
     setError(null);
+    setExpertMeta(null);
     try {
       const response = await apiClient.get('/recipes/recommendations', {
         params: { limit, diverse },
       });
-      setRecommendations(response.data.recommendations);
-      return response.data.recommendations;
+      const list = Array.isArray(response.data.recommendations) ? response.data.recommendations : [];
+      setRecommendations(list);
+      return list;
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'Failed to fetch recommendations';
       setError(errorMsg);
@@ -34,14 +37,45 @@ export const RecipeProvider = ({ children }) => {
     setError(null);
     try {
       const response = await apiClient.post('/expert/recommend', payload);
-      // backend returns recommendations as { recipe, score }
-      const list = (response.data.recommendations || []).map(r => r.recipe || r);
+      const data = response.data || {};
+      const rawList = Array.isArray(data.recommendations) ? data.recommendations : [];
+      setExpertMeta({
+        targets: data.targets || null,
+        totalCandidates: data.totalCandidates ?? 0,
+        filteredCount: data.filteredCount ?? 0,
+      });
+      // Backend returns { id, title, calories, protein, score, reasons, recipe }; merge for RecipeCard
+      const list = rawList.map((r) => {
+        const recipe = r.recipe || r;
+        const id = r.id ?? recipe.id ?? recipe.name ?? 'unknown';
+        const title = r.title ?? recipe.title ?? recipe.name ?? 'Recipe';
+        const calories = typeof r.calories === 'number' ? r.calories : (recipe.nutrition && recipe.nutrition.calories) ?? recipe.calories ?? 0;
+        const protein = typeof r.protein === 'number' ? r.protein : (recipe.nutrition && recipe.nutrition.protein) ?? recipe.protein ?? 0;
+        return {
+          ...recipe,
+          id,
+          title,
+          name: title,
+          calories,
+          protein,
+          nutrition: {
+            ...(recipe.nutrition || {}),
+            calories,
+            protein,
+            sugar: recipe.nutrition?.sugar ?? recipe.sugar ?? 0,
+            sodium: recipe.nutrition?.sodium ?? recipe.sodium ?? 0,
+          },
+          score: r.score,
+          reasons: Array.isArray(r.reasons) ? r.reasons : [],
+        };
+      });
       setRecommendations(list.slice(0, 20));
       return list;
     } catch (err) {
       const errorMsg = err.response?.data?.message || 'Failed to get meal recommendations';
       setError(errorMsg);
       console.error('Error recommending meals:', err);
+      setExpertMeta(null);
       return [];
     } finally {
       setLoading(false);
@@ -145,6 +179,7 @@ export const RecipeProvider = ({ children }) => {
         favorites,
         loading,
         error,
+        expertMeta,
         fetchRecommendations,
         searchRecipes,
         getRecipesByCuisine,
